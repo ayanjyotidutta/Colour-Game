@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ChromaGuess Elite</title>
+    <title>ChromaGuess Elite | Pro Edition</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -12,7 +12,7 @@
         @import url('https://fonts.googleapis.com/css2?family=Chivo+Mono:wght@400;700&family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #000; color: white; -webkit-font-smoothing: antialiased; overflow: hidden; }
         .mono { font-family: 'Chivo Mono', monospace; }
-        
+
         @keyframes heartbeat { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
         .pulse-container { animation: heartbeat 1s ease-in-out infinite; }
 
@@ -21,12 +21,49 @@
         .hue-slider { background: linear-gradient(to right, red, #ff0, lime, cyan, blue, #f0f, red) !important; }
         
         .glass { background: rgba(15, 15, 15, 0.7); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        
+        .stage-card { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .stage-card:hover { transform: scale(1.08) translateY(-10px); z-index: 50; box-shadow: 0 20px 40px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
+
+        const THEMES = [
+            "ELECTRIC NEON TOKYO",
+            "NORDIC WINTER PASTELS",
+            "SAHARA DUST AT DUSK",
+            "DEEP ATLANTIC TRENCH",
+            "ARCTIC GHOST FRONTIER"
+        ];
+
+        const getTieredInfo = (score) => {
+            const s = Math.floor(score);
+            if (s >= 49) return { label: "DIVINE VISIONARY", quote: "Are you a monitor? Your retinas are cheating." };
+            if (s >= 48) return { label: "EYE OF THE TIGER", quote: "Pantone wants your location right now." };
+            if (s >= 47) return { label: "COLOR CONNOISSEUR", quote: "You see the spectrum others only dream of." };
+            if (s >= 46) return { label: "CHROMA MASTER", quote: "Absolute precision. Flawless execution." };
+            if (s >= 45) return { label: "SPECTRUM ELITE", quote: "Your color intuition is scarily accurate." };
+            if (s >= 44) return { label: "VISUAL ARCHITECT", quote: "A masterful display of light and hue." };
+            if (s >= 43) return { label: "OPTIC ACE", quote: "You've got the professional touch." };
+            if (s >= 42) return { label: "PIXEL PERFECT", quote: "Subtle nuances are your playground." };
+            if (s >= 41) return { label: "COLOR MAVEN", quote: "Remarkably close. You have the gift." };
+            if (s >= 40) return { label: "SHADE SPECIALIST", quote: "Strong grasp of the secondary layers." };
+            if (s >= 38) return { label: "VIBE CHECKER", quote: "You've got the vibe, just missing the nuances." };
+            if (s >= 35) return { label: "STEADY EYE", quote: "Solid work. The training is paying off." };
+            if (s >= 31) return { label: "COLOUR CURIOUS", quote: "Getting warmer. Focus on the saturation." };
+            
+            const lowQuotes = [
+                "Is your 'Night Shift' mode on? Be honest.",
+                "You can do better. Squint a little harder next time.",
+                "Good effort, but your retinas need a recalibration.",
+                "The spectrum is wide, and you're just visiting.",
+                "Not quite there yet. Try it in a darker room?"
+            ];
+            return { label: "COLOR APPRENTICE", quote: lowQuotes[s % 5] };
+        };
 
         const hslToRgb = (h, s, l) => {
             s /= 100; l /= 100;
@@ -56,64 +93,78 @@
             const [stage, setStage] = useState('start');
             const [targetColor, setTargetColor] = useState([0, 0, 0]);
             const [guessColor, setGuessColor] = useState([180, 100, 50]);
-            const [scores, setScores] = useState([]);
-            const [timer, setTimer] = useState(5);
+            const [history, setHistory] = useState([]);
+            const [msTimer, setMsTimer] = useState(5000); 
+            const [guessTimer, setGuessTimer] = useState(30); 
 
             useEffect(() => {
                 let id;
-                if ((stage === 'memorize' || stage === 'guess') && timer > 0) {
-                    id = setInterval(() => setTimer(t => t - 1), 1000);
-                } else if (stage === 'memorize' && timer === 0) {
-                    setStage('guess'); setTimer(20);
-                } else if (stage === 'guess' && timer === 0) {
-                    submitGuess();
+                if (stage === 'memorize' && msTimer > 0) {
+                    id = setInterval(() => setMsTimer(prev => prev - 10), 10);
+                } else if (stage === 'memorize' && msTimer <= 0) {
+                    setStage('guess'); setGuessTimer(30);
                 }
                 return () => clearInterval(id);
-            }, [stage, timer]);
+            }, [stage, msTimer]);
 
-            const submitGuess = () => {
+            useEffect(() => {
+                let id;
+                if (stage === 'guess' && guessTimer > 0) {
+                    id = setInterval(() => setGuessTimer(t => t - 1), 1000);
+                } else if (stage === 'guess' && guessTimer === 0) {
+                    finishRound();
+                }
+                return () => clearInterval(id);
+            }, [stage, guessTimer]);
+
+            const finishRound = () => {
                 const s = calculateScore(targetColor, guessColor);
-                setScores([...scores, s]);
+                setHistory([...history, { round, target: targetColor, guess: guessColor, score: s, theme: THEMES[round-1] }]);
                 setStage('result');
+            };
+
+            const formatMs = (ms) => {
+                const s = Math.floor(ms / 1000);
+                const m = Math.floor((ms % 1000) / 10);
+                return `${s}:${m.toString().padStart(2, '0')}`;
             };
 
             const next = () => {
                 if (round < 5) {
                     setRound(round + 1); setTargetColor(generateColor(round + 1));
-                    setGuessColor([180, 100, 50]); setTimer(5); setStage('memorize');
+                    setGuessColor([180, 100, 50]); setMsTimer(5000); setStage('memorize');
                 } else setStage('final');
             };
 
             if (stage === 'start') return (
                 <div className="h-screen flex flex-col items-center justify-center p-6 text-center">
                     <h1 className="text-8xl font-black italic mb-8 tracking-tighter">CHROMA<span className="text-zinc-800">ELITE</span></h1>
-                    <button onClick={() => {setTargetColor(generateColor(1)); setStage('memorize'); setTimer(5);}} className="bg-white text-black px-16 py-4 rounded-full font-black tracking-widest hover:scale-105 transition mb-16 shadow-[0_0_30px_rgba(255,255,255,0.2)]">START GAME</button>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-4xl border-t border-white/10 pt-12">
-                        <div className="space-y-3"><div className="text-2xl">👁️</div><p className="text-[10px] font-black tracking-[0.3em] text-zinc-500 uppercase">Memorize (5s)</p></div>
-                        <div className="space-y-3"><div className="text-2xl">🎨</div><p className="text-[10px] font-black tracking-[0.3em] text-zinc-500 uppercase">Recreate (20s)</p></div>
-                        <div className="space-y-3"><div className="text-2xl">⚖️</div><p className="text-[10px] font-black tracking-[0.3em] text-zinc-500 uppercase">Score Precisely</p></div>
+                    <button onClick={() => {setTargetColor(generateColor(1)); setStage('memorize'); setMsTimer(5000);}} className="bg-white text-black px-16 py-4 rounded-full font-black tracking-widest hover:scale-105 transition mb-16 shadow-[0_0_30px_rgba(255,255,255,0.2)]">START GAME</button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-4xl border-t border-white/10 pt-12 text-zinc-500 uppercase font-black text-[10px] tracking-[0.3em]">
+                        <div>Memorize (5s)</div><div>Recreate (30s)</div><div>Score Elite</div>
                     </div>
-
                     <div className="fixed bottom-10 text-[11px] font-medium tracking-[0.2em] text-zinc-600">Made by Ayan Jyoti Dutta :)</div>
                 </div>
             );
 
             if (stage === 'memorize') return (
                 <div className="h-screen w-full flex items-center justify-center pulse-container" style={{ backgroundColor: `hsl(${targetColor[0]}, ${targetColor[1]}%, ${targetColor[2]}%)` }}>
-                    <div className="bg-black/40 backdrop-blur-2xl rounded-[40px] px-16 py-10 border border-white/10 shadow-2xl">
-                        <div className="text-[120px] font-black mono text-white leading-none tracking-tighter">{timer}</div>
+                    <div className="bg-black/40 backdrop-blur-2xl rounded-[40px] px-16 py-10 border border-white/10">
+                        <div className="text-[120px] font-black mono text-white leading-none tracking-tighter">{formatMs(msTimer)}</div>
                     </div>
                 </div>
             );
 
             if (stage === 'guess') return (
-                <div className="h-screen w-full relative flex items-center justify-center transition-colors duration-200" style={{ backgroundColor: `hsl(${guessColor[0]}, ${guessColor[1]}%, ${guessColor[2]}%)` }}>
-                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-xl px-10 py-3 rounded-full border border-white/10">
-                        <span className="mono font-bold text-3xl tracking-widest">{timer}S</span>
+                <div className="h-screen w-full relative flex items-center justify-center" style={{ backgroundColor: `hsl(${guessColor[0]}, ${guessColor[1]}%, ${guessColor[2]}%)` }}>
+                    <div className="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+                        <div className="bg-black/50 backdrop-blur-xl px-10 py-3 rounded-full border border-white/10">
+                            <span className="mono font-bold text-3xl tracking-widest">{guessTimer}S</span>
+                        </div>
+                        <div className="text-[10px] font-black tracking-[0.4em] text-white/50 bg-black/30 px-4 py-1 rounded-full">{THEMES[round-1]}</div>
                     </div>
 
-                    <div className="absolute top-24 right-8 bottom-8 w-80 glass rounded-[40px] p-8 flex flex-col gap-10 z-10">
+                    <div className="absolute top-28 right-8 bottom-8 w-80 glass rounded-[40px] p-8 flex flex-col gap-10 z-10 shadow-2xl">
                         <div className="space-y-4">
                             <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Hue • {guessColor[0]}°</label>
                             <input type="range" min="0" max="360" value={guessColor[0]} onChange={e => setGuessColor([parseInt(e.target.value), guessColor[1], guessColor[2]])} className="hue-slider" />
@@ -126,7 +177,7 @@
                             <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Brightness • {guessColor[2]}%</label>
                             <input type="range" min="0" max="100" value={guessColor[2]} onChange={e => setGuessColor([guessColor[0], guessColor[1], parseInt(e.target.value)])} />
                         </div>
-                        <button onClick={submitGuess} className="mt-auto bg-white text-black py-4 rounded-2xl font-black tracking-widest uppercase text-xs hover:bg-zinc-200 active:scale-95 transition">SUBMIT GUESS</button>
+                        <button onClick={finishRound} className="mt-auto bg-white text-black py-4 rounded-2xl font-black tracking-widest uppercase text-xs hover:bg-zinc-200 active:scale-95 transition">SUBMIT GUESS</button>
                     </div>
                 </div>
             );
@@ -137,41 +188,47 @@
                     <div className="flex-1 w-full" style={{ backgroundColor: `hsl(${guessColor[0]}, ${guessColor[1]}%, ${guessColor[2]}%)` }} />
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6 z-20">
                         <div className="bg-white text-black px-12 py-6 rounded-[32px] shadow-3xl border-[10px] border-black text-center">
-                            <div className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30 mb-1">Score</div>
-                            <div className="text-6xl font-black mono">{scores[scores.length-1]}</div>
+                            <div className="text-6xl font-black mono">{history[history.length-1].score}</div>
                         </div>
                         <button onClick={next} className="bg-white/10 hover:bg-white/20 backdrop-blur-2xl text-white px-10 py-3 rounded-full font-black tracking-widest border border-white/20 uppercase text-[10px] transition">Next Round</button>
                     </div>
-                    <div className="absolute inset-x-0 h-px bg-white/20 top-1/2 z-10" />
                 </div>
             );
 
             if (stage === 'final') {
-                const rawTotal = scores.reduce((a, b) => a + b, 0);
+                const rawTotal = history.reduce((a, b) => a + b.score, 0);
                 const totalDisplay = rawTotal.toFixed(2);
-                
-                // Logic: if decimal < 0.5, target next whole number. if >= 0.5, target two whole numbers up.
-                const decimalPart = rawTotal % 1;
-                const targetScore = decimalPart < 0.5 ? Math.ceil(rawTotal) : Math.floor(rawTotal) + 2;
-                
+                const decimal = rawTotal % 1;
+                const targetScore = decimal < 0.5 ? Math.ceil(rawTotal) : Math.floor(rawTotal) + 2;
                 const retryText = rawTotal < 48 ? `TRY BEATING ${targetScore}` : "RETRY CHALLENGE";
-                
+                const tier = getTieredInfo(rawTotal);
+
                 return (
-                    <div className="h-screen w-full bg-[#080808] p-10 flex flex-col items-center justify-between overflow-hidden">
-                        <div className="flex-grow flex flex-col items-center justify-center text-center">
-                            <h2 className="text-zinc-600 font-black tracking-[0.5em] text-[10px] uppercase mb-4 italic">Session Complete</h2>
-                            <div className="text-[160px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
-                            <div className="bg-white/5 border border-white/10 px-8 py-2 rounded-full text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Lvl. Color Connoisseur</div>
+                    <div className="h-screen w-full bg-[#080808] p-10 flex flex-col items-center overflow-y-auto">
+                        <div className="flex-grow flex flex-col items-center justify-center text-center mt-12 mb-16">
+                            <h2 className="text-blue-400 font-black tracking-[0.4em] text-[16px] md:text-[24px] uppercase mb-4 italic">{tier.label}</h2>
+                            <div className="text-[120px] md:text-[180px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
+                            <p className="text-zinc-500 font-medium italic text-lg opacity-80 mb-4 select-none">"{tier.quote}"</p>
                         </div>
-                        <div className="w-full max-w-4xl grid grid-cols-5 gap-4 mb-16">
-                            {scores.map((s, i) => (
-                                <div key={i} className="bg-[#111] border border-zinc-800 rounded-2xl p-4 text-center">
-                                    <div className="text-[8px] font-black text-zinc-600 mb-1 uppercase tracking-widest">R{i+1}</div>
-                                    <div className="mono font-bold text-white/80">{s}</div>
+
+                        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-5 gap-6 mb-20 px-4">
+                            {history.map(h => (
+                                <div key={h.round} className="stage-card bg-[#111] border border-zinc-800 rounded-[32px] p-6 flex flex-col gap-5 border">
+                                    <div className="flex justify-between items-center px-1">
+                                        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Stage 0{h.round}</span>
+                                        <span className="mono font-bold text-white/90 text-sm">{h.score}</span>
+                                    </div>
+                                    <div className="h-32 rounded-2xl overflow-hidden border border-zinc-900 shadow-2xl relative">
+                                        <div className="h-1/2 w-full" style={{ backgroundColor: `hsl(${h.target[0]}, ${h.target[1]}%, ${h.target[2]}%)` }} />
+                                        <div className="h-1/2 w-full" style={{ backgroundColor: `hsl(${h.guess[0]}, ${h.guess[1]}%, ${h.guess[2]}%)` }} />
+                                        <div className="absolute inset-x-0 h-px bg-white/10 top-1/2" />
+                                    </div>
+                                    <div className="text-[9px] font-black text-zinc-700 uppercase tracking-tighter truncate text-center">{h.theme}</div>
                                 </div>
                             ))}
                         </div>
-                        <button onClick={() => window.location.reload()} className="bg-white text-black px-16 py-5 rounded-full font-black tracking-[0.2em] uppercase text-sm hover:scale-105 transition mb-10 shadow-2xl">
+
+                        <button onClick={() => window.location.reload()} className="bg-white text-black px-20 py-5 rounded-full font-black tracking-[0.3em] uppercase text-sm hover:scale-110 hover:bg-zinc-200 transition mb-20 shadow-2xl">
                             {retryText}
                         </button>
                         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-[11px] font-medium tracking-[0.2em] text-zinc-700">Made by Ayan Jyoti Dutta :)</div>

@@ -25,7 +25,10 @@
         .stage-card { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .stage-card:hover { transform: scale(1.08) translateY(-10px); z-index: 50; box-shadow: 0 20px 40px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.3); }
 
-        /* Toast Animation */
+        /* Social Share Glow & Lift */
+        .share-btn { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .share-btn:hover { transform: translateY(-8px) scale(1.02); box-shadow: 0 0 40px rgba(255,255,255,0.15); border-color: rgba(255,255,255,0.4); }
+
         @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
         .toast { animation: slideUp 0.3s ease-out forwards; }
     </style>
@@ -146,9 +149,11 @@
                 setTimeout(() => setToast(null), 2000);
             };
 
-            const copyToClipboard = (text) => {
+            const copyShareData = (tier, display) => {
+                const shareURL = window.location.href;
+                const text = `OpticAI Result: I scored ${display}/50! My vision is officially "${tier.label}". Can you beat me? \n\nPlay here: ${shareURL}`;
                 navigator.clipboard.writeText(text).then(() => {
-                    triggerToast("Copied to clipboard");
+                    triggerToast("Result + Link Copied!");
                 });
             };
 
@@ -175,8 +180,7 @@
                     </div>
 
                     <button onClick={() => {setTargetColor(generateColor(1)); setStage('memorize'); setMsTimer(5000);}} className="bg-white text-black px-16 py-4 rounded-full font-black tracking-widest hover:scale-105 transition mb-6 shadow-2xl active:scale-95">START GAME</button>
-                    
-                    <p className="text-sm font-bold tracking-[0.25em] text-white/60 uppercase mb-16 select-none">
+                    <p className="text-sm font-bold tracking-[0.25em] text-white/60 uppercase mb-16 select-none italic">
                         5 Rounds. 1 Crown. Are your eyes lying to you?
                     </p>
 
@@ -236,17 +240,13 @@
                 const totalDisplay = rawTotal.toFixed(2);
                 const decimalPart = rawTotal % 1;
                 const targetScore = decimalPart < 0.5 ? Math.ceil(rawTotal) : Math.floor(rawTotal) + 2;
-                const retryText = rawTotal < 48 ? `TRY BEATING ${targetScore}` : "RETRY CHALLENGE";
+                const retryText = rawTotal < 48 ? `TRY BEATING ${targetScore} SCORE` : "RETRY CHALLENGE";
                 const tier = getTieredInfo(rawTotal);
-
-                // Share Strings
-                const shareURL = window.location.href;
-                const shareText = `OpticAI Result: I scored ${totalDisplay}/50! My vision is officially "${tier.label}". Can you beat me? \n\nPlay here: ${shareURL}`;
                 
                 return (
                     <div className="h-screen w-full bg-[#080808] p-10 flex flex-col items-center overflow-y-auto relative">
                         {toast && (
-                            <div className="fixed bottom-32 left-1/2 toast z-[100] bg-white text-black px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">
+                            <div className="fixed bottom-32 left-1/2 toast z-[100] bg-white text-black px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">
                                 {toast}
                             </div>
                         )}
@@ -274,33 +274,18 @@
                             ))}
                         </div>
 
-                        <div className="flex flex-col items-center gap-6 mb-20 w-full max-w-sm">
-                            <button onClick={() => window.location.reload()} className="w-full bg-white text-black px-20 py-5 rounded-full font-black tracking-[0.3em] uppercase text-sm hover:scale-105 transition shadow-2xl">
-                                {retryText}
+                        <div className="flex flex-col items-center gap-4 mb-20 w-full max-w-sm">
+                            {/* CONSOLIDATED SHARE BUTTON */}
+                            <button 
+                                onClick={() => copyShareData(tier, totalDisplay)}
+                                className="share-btn w-full bg-zinc-900 border border-white/20 text-white py-6 rounded-[32px] font-black tracking-[0.4em] uppercase text-xs shadow-xl"
+                            >
+                                Share Vision with Friends
                             </button>
 
-                            <div className="grid grid-cols-2 gap-4 w-full">
-                                <button 
-                                    onClick={() => copyToClipboard(shareURL)}
-                                    className="bg-zinc-900 border border-white/10 text-white/50 hover:text-white py-4 rounded-3xl text-[9px] font-black uppercase tracking-widest transition"
-                                >
-                                    Copy Link
-                                </button>
-                                <button 
-                                    onClick={() => copyToClipboard(shareText)}
-                                    className="bg-zinc-900 border border-white/10 text-white/50 hover:text-white py-4 rounded-3xl text-[9px] font-black uppercase tracking-widest transition"
-                                >
-                                    Copy Result
-                                </button>
-                            </div>
-
-                            <a 
-                                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareURL)}`}
-                                target="_blank"
-                                className="text-[10px] font-bold text-zinc-600 hover:text-blue-400 tracking-[0.2em] transition uppercase"
-                            >
-                                Share on LinkedIn →
-                            </a>
+                            <button onClick={() => window.location.reload()} className="w-full bg-white/5 border border-white/10 text-white/40 hover:text-white py-4 rounded-full font-black tracking-[0.2em] uppercase text-[10px] transition">
+                                {retryText}
+                            </button>
                         </div>
 
                         <div className="text-[11px] font-medium tracking-[0.2em] text-zinc-700 uppercase mb-10">Made by Ayan Jyoti Dutta :)</div>

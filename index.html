@@ -83,6 +83,7 @@
             border-color: rgba(255, 255, 255, 0.3);
         }
 
+        /* Master Neomorphic Class - Upgraded for Realism */
         .neu-btn {
             background: linear-gradient(145deg, #0d0d0f, #080809);
             box-shadow: 6px 6px 14px #020202, -3px -3px 10px #1a1b1f;
@@ -91,9 +92,14 @@
         }
 
         .neu-btn:hover {
-            transform: translateY(-6px);
+            transform: translateY(-5px);
             box-shadow: 8px 8px 20px #010101, -4px -4px 12px #222429;
-            border-color: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .neu-btn:active {
+            transform: translateY(-2px);
+            box-shadow: inset 4px 4px 8px #010101, inset -2px -2px 6px #1a1b1f;
         }
 
         .neu-btn-white {
@@ -124,7 +130,6 @@
             animation: slideUp 0.3s ease-out forwards;
         }
 
-        /* Auto-Next Progress Ring */
         .timer-svg {
             transform: rotate(-90deg);
         }
@@ -210,12 +215,9 @@
             useEffect(() => {
                 let id;
                 if (stage === 'memorize' && msTimer > 0) {
-                    id = setInterval(() => {
-                        setMsTimer(prev => Math.max(0, prev - 4));
-                    }, 4);
+                    id = setInterval(() => { setMsTimer(prev => Math.max(0, prev - 4)); }, 4);
                 } else if (stage === 'memorize' && msTimer <= 0) {
-                    setStage('guess');
-                    setGuessTimer(30);
+                    setStage('guess'); setGuessTimer(30);
                 }
                 return () => clearInterval(id);
             }, [stage, msTimer]);
@@ -230,7 +232,6 @@
                 return () => clearInterval(id);
             }, [stage, guessTimer]);
 
-            // Auto-advance logic for Result Stage
             useEffect(() => {
                 let id;
                 if (stage === 'result' && resultTimer > -1) {
@@ -244,7 +245,7 @@
             const submitGuess = () => {
                 const s = calculateScore(targetColor, guessColor);
                 setHistory([...history, { round, target: targetColor, guess: guessColor, score: s }]);
-                setResultTimer(5); // Reset the 5s auto-timer
+                setResultTimer(5);
                 setStage('result');
             };
 
@@ -282,7 +283,7 @@
                             <h3 className="font-black text-[14px] tracking-[0.1em] uppercase text-zinc-1000">Stare</h3>
                             <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">5 seconds. Burn the color into your retinas. Don't blink!</p>
                         </div>
-                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-3 scale-105 bg-white/[0.07] border-white/10 shadow-xl">
+                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-3">
                             <div className="text-3xl">🎨</div>
                             <h3 className="font-black text-[14px] tracking-[0.1em] uppercase text-text-zinc-1000">Match</h3>
                             <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">30 seconds to recreate that magic. It's your time to shine.</p>
@@ -290,7 +291,7 @@
                         <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-3">
                             <div className="text-3xl">⚖️</div>
                             <h3 className="font-black text-[14px] tracking-[0.1em] uppercase text-zinc-1000">Score</h3>
-                            <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">We score with Elite precision. Aim for a "9" or higher.</p>
+                            <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">We score with Elite precision. Aim for a "7" or higher each round.</p>
                         </div>
                     </div>
                     <button onClick={() => { setTargetColor(generateColor(1)); setStage('memorize'); setMsTimer(5000); }} className="neu-btn-white text-black px-12 py-6 rounded-full font-black tracking-[0.05em] text-[24px] flex items-center justify-center gap-6 group mb-6 transition-all active:scale-95">
@@ -321,7 +322,11 @@
                         <div className="space-y-4"><label className="text-[10px] font-black uppercase tracking-widest text-white/40">Hue Selection • {guessColor[0]}°</label><input type="range" min="0" max="360" value={guessColor[0]} onChange={e => setGuessColor([parseInt(e.target.value), guessColor[1], guessColor[2]])} className="hue-slider" /></div>
                         <div className="space-y-4"><label className="text-[10px] font-black uppercase tracking-widest text-white/40">Saturation • {guessColor[1]}%</label><input type="range" min="0" max="100" value={guessColor[1]} onChange={e => setGuessColor([guessColor[0], parseInt(e.target.value), guessColor[2]])} /></div>
                         <div className="space-y-4"><label className="text-[10px] font-black uppercase tracking-widest text-white/40">Brightness • {guessColor[2]}%</label><input type="range" min="0" max="100" value={guessColor[2]} onChange={e => setGuessColor([guessColor[0], guessColor[1], parseInt(e.target.value)])} /></div>
-                        <button onClick={submitGuess} className="mt-auto bg-white text-black py-5 rounded-2xl font-black tracking-widest uppercase text-xl hover:bg-zinc-200 active:scale-95 transition">Lock it In</button>
+
+                        {/* NEOMORPHIC "LOCK IT IN" BUTTON */}
+                        <button onClick={submitGuess} className="neu-btn mt-auto text-white py-5 rounded-2xl font-black tracking-widest uppercase text-xl active:scale-95">
+                            Lock it In
+                        </button>
                     </div>
                 </div>
             );
@@ -344,8 +349,8 @@
                             <div className="text-6xl font-black mono">{history[history.length - 1].score}</div>
                         </div>
 
-                        {/* AUTO-NEXT BUTTON WITH PROGRESS RING */}
-                        <button onClick={next} className="bg-white/10 hover:bg-white/20 backdrop-blur-2xl text-white px-10 py-3 rounded-full font-black border border-white/20 text-[20px] transition flex items-center gap-4 group">
+                        {/* NEOMORPHIC "NEXT ROUND" BUTTON */}
+                        <button onClick={next} className="neu-btn px-10 py-3 rounded-full font-black border border-white/10 text-white text-[20px] flex items-center gap-4 group">
                             Next Round
                             <div className="relative w-8 h-8 flex items-center justify-center">
                                 <svg className="timer-svg w-full h-full" viewBox="0 0 36 36">
@@ -353,7 +358,7 @@
                                     <circle className="timer-circle stroke-white fill-none" strokeWidth="3" cx="18" cy="18" r="16"
                                         style={{ strokeDashoffset: (resultTimer / 5) * 100 }} />
                                 </svg>
-                                <span className="absolute text-[12px] mono">{resultTimer}</span>
+                                <span className="absolute text-[10px] mono">{resultTimer}</span>
                             </div>
                         </button>
                     </div>
@@ -374,7 +379,7 @@
                         {toast && <div className="fixed bottom-32 left-1/2 toast z-[100] bg-white text-black px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">{toast}</div>}
                         <div className="flex-grow flex flex-col items-center justify-center text-center mt-12 mb-16">
                             <h2 className="text-blue-400 font-black tracking-[0.4em] text-[24px] uppercase mb-4 italic">{tier.label}</h2>
-                            <div className="text-[50px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
+                            <div className="text-[160px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
                             <p className="text-zinc-500 font-medium italic text-lg opacity-80 mb-4 select-none">"{tier.quote}"</p>
                         </div>
 

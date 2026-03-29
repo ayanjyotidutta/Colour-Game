@@ -1,15 +1,10 @@
-## 📖 Quick Links
-- [🚀 Live Benchmark](https://opticalgame.vercel.app/)
-- [🎯 Strategic PRD](#2-product-requirements-prd)
-- [🧬 Technical Scoring Appendix](#5-technical-appendix-the-scoring-engine)
-- [🗺️ User Journey Map](#4-user-journey-map)
+## 📖 Quick Link
+- [🚀 Live Game Link](https://opticalgame.vercel.app/)
 
 # OpticAI 👁️
 **High-Fidelity Perceptual Benchmarking & Visual Memory Engine**
 
-OpticAI is a minimalist, high-stakes vision benchmark designed to quantify the limits of human color perception. By bridging the gap between brand strategy and technical execution, it challenges users to retain and recreate complex HSL spectrums under high-velocity constraints.
-
-### 🚀 [Live Benchmark: https://opticalgame.vercel.app/]
+OpticAI is a minimalist, high-stakes vision benchmark designed to quantify the limits of human color perception. By connecting brand strategy with technical execution, it challenges users to retain and recreate complex HSL spectrums under tight deadlines.
 
 ### 🎯 Strategic Vision
 Developed as a "Perceptual Audit" tool, OpticAI explores the intersection of **Computer Vision** and **Human Cognition**. It gamifies the principles of the Munsell Color System to quantify how accurately we retain visual equity (color) under psychological and temporal pressure.

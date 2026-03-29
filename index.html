@@ -24,6 +24,10 @@
         
         .stage-card { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         .stage-card:hover { transform: scale(1.08) translateY(-10px); z-index: 50; box-shadow: 0 20px 40px rgba(0,0,0,0.6); border-color: rgba(255,255,255,0.3); }
+
+        /* Toast Animation */
+        @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .toast { animation: slideUp 0.3s ease-out forwards; }
     </style>
 </head>
 <body>
@@ -102,6 +106,7 @@
             const [history, setHistory] = useState([]);
             const [msTimer, setMsTimer] = useState(5000); 
             const [guessTimer, setGuessTimer] = useState(30);
+            const [toast, setToast] = useState(null);
 
             useEffect(() => {
                 let id;
@@ -134,6 +139,17 @@
                     setRound(round + 1); setTargetColor(generateColor(round + 1));
                     setGuessColor([180, 100, 50]); setMsTimer(5000); setStage('memorize');
                 } else setStage('final');
+            };
+
+            const triggerToast = (msg) => {
+                setToast(msg);
+                setTimeout(() => setToast(null), 2000);
+            };
+
+            const copyToClipboard = (text) => {
+                navigator.clipboard.writeText(text).then(() => {
+                    triggerToast("Copied to clipboard");
+                });
             };
 
             if (stage === 'start') return (
@@ -222,16 +238,26 @@
                 const targetScore = decimalPart < 0.5 ? Math.ceil(rawTotal) : Math.floor(rawTotal) + 2;
                 const retryText = rawTotal < 48 ? `TRY BEATING ${targetScore}` : "RETRY CHALLENGE";
                 const tier = getTieredInfo(rawTotal);
+
+                // Share Strings
+                const shareURL = window.location.href;
+                const shareText = `OpticAI Result: I scored ${totalDisplay}/50! My vision is officially "${tier.label}". Can you beat me? \n\nPlay here: ${shareURL}`;
                 
                 return (
-                    <div className="h-screen w-full bg-[#080808] p-10 flex flex-col items-center overflow-y-auto">
+                    <div className="h-screen w-full bg-[#080808] p-10 flex flex-col items-center overflow-y-auto relative">
+                        {toast && (
+                            <div className="fixed bottom-32 left-1/2 toast z-[100] bg-white text-black px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">
+                                {toast}
+                            </div>
+                        )}
+
                         <div className="flex-grow flex flex-col items-center justify-center text-center mt-12 mb-16">
                             <h2 className="text-blue-400 font-black tracking-[0.4em] text-[24px] uppercase mb-4 italic">{tier.label}</h2>
                             <div className="text-[160px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
                             <p className="text-zinc-500 font-medium italic text-lg opacity-80 mb-4 select-none">"{tier.quote}"</p>
                         </div>
 
-                        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-5 gap-6 mb-20 px-4">
+                        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-5 gap-6 mb-12 px-4">
                             {history.map(h => (
                                 <div key={h.round} className="stage-card bg-[#111] border border-zinc-800 rounded-[32px] p-6 flex flex-col gap-5 border">
                                     <div className="flex justify-between items-center px-1">
@@ -248,10 +274,36 @@
                             ))}
                         </div>
 
-                        <button onClick={() => window.location.reload()} className="bg-white text-black px-20 py-5 rounded-full font-black tracking-[0.3em] uppercase text-sm hover:scale-105 transition mb-10 shadow-2xl">
-                            {retryText}
-                        </button>
-                        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 text-[11px] font-medium tracking-[0.2em] text-zinc-700 uppercase">Made by Ayan Jyoti Dutta :)</div>
+                        <div className="flex flex-col items-center gap-6 mb-20 w-full max-w-sm">
+                            <button onClick={() => window.location.reload()} className="w-full bg-white text-black px-20 py-5 rounded-full font-black tracking-[0.3em] uppercase text-sm hover:scale-105 transition shadow-2xl">
+                                {retryText}
+                            </button>
+
+                            <div className="grid grid-cols-2 gap-4 w-full">
+                                <button 
+                                    onClick={() => copyToClipboard(shareURL)}
+                                    className="bg-zinc-900 border border-white/10 text-white/50 hover:text-white py-4 rounded-3xl text-[9px] font-black uppercase tracking-widest transition"
+                                >
+                                    Copy Link
+                                </button>
+                                <button 
+                                    onClick={() => copyToClipboard(shareText)}
+                                    className="bg-zinc-900 border border-white/10 text-white/50 hover:text-white py-4 rounded-3xl text-[9px] font-black uppercase tracking-widest transition"
+                                >
+                                    Copy Result
+                                </button>
+                            </div>
+
+                            <a 
+                                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareURL)}`}
+                                target="_blank"
+                                className="text-[10px] font-bold text-zinc-600 hover:text-blue-400 tracking-[0.2em] transition uppercase"
+                            >
+                                Share on LinkedIn →
+                            </a>
+                        </div>
+
+                        <div className="text-[11px] font-medium tracking-[0.2em] text-zinc-700 uppercase mb-10">Made by Ayan Jyoti Dutta :)</div>
                     </div>
                 );
             }

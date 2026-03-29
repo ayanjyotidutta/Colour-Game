@@ -366,8 +366,9 @@
                             <div className="text-[24px] font-black tracking-[0.1em] opacity-30 mb-1">Score</div>
                             <div className="text-6xl font-black mono">{history[history.length - 1].score}</div>
                         </div>
+                        {/* UPDATE 1: Next Round button text logic */}
                         <button onClick={next} className="neu-btn px-10 py-3 rounded-full font-black border border-white/10 text-white text-[20px] flex items-center gap-4 group">
-                            Next Round
+                            {round === 5 ? "Game Over!" : "Next Round"}
                             <div className="relative w-8 h-8 flex items-center justify-center">
                                 <svg className="timer-svg w-full h-full" viewBox="0 0 36 36">
                                     <circle className="stroke-white/10 fill-none" strokeWidth="3" cx="18" cy="18" r="16" />
@@ -386,8 +387,12 @@
                 const rawTotal = history.reduce((a, b) => a + b.score, 0);
                 const totalDisplay = rawTotal.toFixed(2);
                 const decimalPart = rawTotal % 1;
-                const targetScore = decimalPart < 0.5 ? Math.ceil(rawTotal) : Math.floor(rawTotal) + 2;
-                const retryText = rawTotal < 48 ? `Try Beating ${targetScore} Score` : "Retry Challenge";
+                const calculatedTarget = decimalPart < 0.5 ? Math.ceil(rawTotal) : Math.floor(rawTotal) + 2;
+
+                {/* UPDATE 2: Try Beating Logic Floor at 25 */ }
+                const targetScore = Math.max(25, calculatedTarget);
+                const retryText = `Try Beating ${targetScore} Score`;
+
                 const tier = getTieredInfo(rawTotal);
 
                 return (

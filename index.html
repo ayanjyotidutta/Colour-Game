@@ -123,6 +123,16 @@
         .toast {
             animation: slideUp 0.3s ease-out forwards;
         }
+
+        /* Auto-Next Progress Ring */
+        .timer-svg {
+            transform: rotate(-90deg);
+        }
+
+        .timer-circle {
+            transition: stroke-dashoffset 1s linear;
+            stroke-dasharray: 100;
+        }
     </style>
 </head>
 
@@ -220,9 +230,21 @@
                 return () => clearInterval(id);
             }, [stage, guessTimer]);
 
+            // Auto-advance logic for Result Stage
+            useEffect(() => {
+                let id;
+                if (stage === 'result' && resultTimer > -1) {
+                    id = setInterval(() => setResultTimer(t => t - 1), 1000);
+                } else if (stage === 'result' && resultTimer === -1) {
+                    next();
+                }
+                return () => clearInterval(id);
+            }, [stage, resultTimer]);
+
             const submitGuess = () => {
                 const s = calculateScore(targetColor, guessColor);
                 setHistory([...history, { round, target: targetColor, guess: guessColor, score: s }]);
+                setResultTimer(5); // Reset the 5s auto-timer
                 setStage('result');
             };
 
@@ -250,17 +272,6 @@
                     triggerToast("Score Card Copied!");
                 });
             };
-
-            useEffect(() => {
-                let id;
-                if (stage === 'result' && resultTimer > 0) {
-                    id = setInterval(() => setResultTimer(t => t - 1), 1000);
-                } else if (stage === 'result' && resultTimer === 0) {
-                    next(); // Automatically trigger the next round
-                    setResultTimer(5); // Reset for the next time we hit results
-                }
-                return () => clearInterval(id);
-            }, [stage, resultTimer]);
 
             if (stage === 'start') return (
                 <div className="h-screen flex flex-col items-center justify-center p-8 text-center bg-[#050505]">
@@ -328,8 +339,23 @@
                         </div>
                     </div>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-6 z-20">
-                        <div className="bg-white text-black px-12 py-6 rounded-[32px] shadow-xl border-[5px] border-black/30 text-center"><div className="text-[24px] font-black tracking-[0.1em] opacity-30 mb-1">Score</div><div className="text-6xl font-black mono">{history[history.length - 1].score}</div></div>
-                        <button onClick={next} className="bg-white/10 hover:bg-white/20 backdrop-blur-2xl text-white px-10 py-3 rounded-full font-black tracking-widest border border-white/20 text-[20px] transition">Next Round</button>
+                        <div className="bg-white text-black px-12 py-6 rounded-[32px] shadow-xl border-[5px] border-black/30 text-center">
+                            <div className="text-[24px] font-black tracking-[0.1em] opacity-30 mb-1">Score</div>
+                            <div className="text-6xl font-black mono">{history[history.length - 1].score}</div>
+                        </div>
+
+                        {/* AUTO-NEXT BUTTON WITH PROGRESS RING */}
+                        <button onClick={next} className="bg-white/10 hover:bg-white/20 backdrop-blur-2xl text-white px-10 py-3 rounded-full font-black border border-white/20 text-[20px] transition flex items-center gap-4 group">
+                            Next Round
+                            <div className="relative w-8 h-8 flex items-center justify-center">
+                                <svg className="timer-svg w-full h-full" viewBox="0 0 36 36">
+                                    <circle className="stroke-white/10 fill-none" strokeWidth="3" cx="18" cy="18" r="16" />
+                                    <circle className="timer-circle stroke-white fill-none" strokeWidth="3" cx="18" cy="18" r="16"
+                                        style={{ strokeDashoffset: (resultTimer / 5) * 100 }} />
+                                </svg>
+                                <span className="absolute text-[12px] mono">{resultTimer}</span>
+                            </div>
+                        </button>
                     </div>
                     <div className="absolute inset-x-0 h-px bg-white/20 top-1/2 z-10" />
                 </div>
@@ -348,14 +374,14 @@
                         {toast && <div className="fixed bottom-32 left-1/2 toast z-[100] bg-white text-black px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl">{toast}</div>}
                         <div className="flex-grow flex flex-col items-center justify-center text-center mt-12 mb-16">
                             <h2 className="text-blue-400 font-black tracking-[0.4em] text-[24px] uppercase mb-4 italic">{tier.label}</h2>
-                            <div className="text-[160px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
+                            <div className="text-[50px] font-black leading-none tracking-tighter mono mb-6 select-none">{totalDisplay}</div>
                             <p className="text-zinc-500 font-medium italic text-lg opacity-80 mb-4 select-none">"{tier.quote}"</p>
                         </div>
 
                         <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-5 gap-6 mb-12 px-4">
-                            {history.map(h => (
-                                <div key={h.round} className="stage-card bg-[#111] border border-zinc-800 rounded-[32px] p-6 flex flex-col gap-5 border">
-                                    <div className="flex justify-between items-center px-1"><span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Stage 0{h.round}</span><span className="mono font-bold text-white/90 text-sm">{h.score}</span></div>
+                            {history.map((h, i) => (
+                                <div key={i} className="stage-card bg-[#111] border border-zinc-800 rounded-[32px] p-6 flex flex-col gap-5 border">
+                                    <div className="flex justify-between items-center px-1"><span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Stage 0{i + 1}</span><span className="mono font-bold text-white/90 text-sm">{h.score}</span></div>
                                     <div className="h-32 rounded-2xl overflow-hidden border border-zinc-900 shadow-2xl relative">
                                         <div className="h-1/2 w-full" style={{ backgroundColor: `hsl(${h.target[0]}, ${h.target[1]}%, ${h.target[2]}%)` }} />
                                         <div className="h-1/2 w-full" style={{ backgroundColor: `hsl(${h.guess[0]}, ${h.guess[1]}%, ${h.guess[2]}%)` }} />
@@ -366,7 +392,7 @@
                         </div>
 
                         <div className="flex flex-col items-center gap-6 mb-20 w-full max-w-md">
-                            <button onClick={() => copyGameLink(tier, totalDisplay)} className="neu-btn w-full text-white py-6 rounded-full font-black tracking-[0.2em] text-lg flex items-center justify-center gap-6 group px-10">
+                            <button onClick={copyGameLink} className="neu-btn w-full text-white py-6 rounded-full font-black tracking-[0.2em] text-lg flex items-center justify-center gap-6 group px-10">
                                 <span className="text-white/90">Copy Link</span>
                                 <div className="bg-white/10 w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-white/20 transition-colors">
                                     <svg className="w-5 h-5 text-white/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 13L15 9M15 9H9M15 9V15" /><circle cx="12" cy="12" r="10" /></svg>

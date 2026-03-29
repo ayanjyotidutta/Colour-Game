@@ -30,6 +30,9 @@ Visual professionals (Brand Managers, UI Designers) lack a quantitative method t
 ### 4.4 Social Equity (Viral Loop)
 * **Consolidated Share:** A single "Share OpticAI" CTA that copies a pre-formatted performance summary (Tier Name + Score + App Link) to the clipboard.
 
+### 4.5 Chronometer Logic:
+* **Timer:** The Memory Phase utilizes a *decimal-based centisecond timer* (Base-100) rather than a sexagesimal (Base-60) system. This ensures a smoother visual "scroll" and aligns with digital high-precision timing standards.
+
 ## 5. Success Metrics (KPIs)
 * **K-Factor:** Frequency of result sharing per unique user session.
 * **Completion Rate:** Percentage of users who finish all 5 rounds (Target: >70%).

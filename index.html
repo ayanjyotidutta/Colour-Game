@@ -25,9 +25,7 @@
             background-color: #000;
             color: white;
             -webkit-font-smoothing: antialiased;
-            /* MOBILE FIX: Allow scrolling only on final result screen if content overflows */
             overflow-x: hidden;
-            touch-action: manipulation;
         }
 
         .mono {
@@ -98,7 +96,7 @@
         }
 
         .glass {
-            background: rgba(15, 15, 15, 0.7);
+            background: rgba(15, 15, 15, 0.75);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -150,6 +148,18 @@
             }
         }
 
+        .stage-card-interactive {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: pointer;
+        }
+
+        .stage-card-interactive:hover {
+            transform: translateY(-12px) scale(1.02);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(255, 255, 255, 0.05);
+            z-index: 10;
+        }
+
         .toast {
             animation: slideUp 0.3s ease-out forwards;
             position: fixed;
@@ -167,13 +177,37 @@
             transition: stroke-dashoffset 1s linear;
             stroke-dasharray: 100;
         }
+
+        #picker-canvas {
+            border-radius: 16px;
+            cursor: crosshair;
+            touch-action: none;
+            display: block;
+            width: 100%;
+        }
+
+        .picker-cursor {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .picker-wrap {
+            position: relative;
+            width: 100%;
+        }
     </style>
 </head>
 
 <body>
     <div id="root"></div>
     <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        const { useState, useEffect, useRef, useCallback } = React;
 
         const getTieredInfo = (score) => {
             const s = Math.floor(score);
@@ -190,7 +224,6 @@
             if (s >= 38) return { label: "VIBE CHECKER", quote: "You've got the vibe, just missing the nuances." };
             if (s >= 35) return { label: "STEADY EYE", quote: "Solid work. The training is paying off." };
             if (s >= 31) return { label: "COLOUR CURIOUS", quote: "Getting warmer. Focus on the saturation." };
-
             const lowQuotes = [
                 "Is your 'Night Shift' mode on? Be honest.",
                 "You can do better. Squint a little harder next time.",
@@ -209,18 +242,11 @@
             return [255 * f(0), 255 * f(8), 255 * f(4)];
         };
 
-        const calculateScore = (targetColor, guessColor) => {
-            const [r1, g1, b1] = hslToRgb(...targetColor);
-            const [r2, g2, b2] = hslToRgb(...guessColor);
-            const dist = Math.sqrt(Math.pow(r1 - r2, 2) + Math.pow(g1 - g2, 2) + Math.pow(b1 - b2, 2));
-            return parseFloat((10 * Math.pow(1 - (dist / 441.67), 1.8)).toFixed(2));
-        };
-
         const generateColor = (round) => {
             const h = Math.floor(Math.random() * 360);
             if (round === 1) return [h, 90, 50];
             if (round === 3) return [h, 20, 80];
-            if (round === 5) return [h, 15, 12];
+            if (round === 5) return [h, 15, 40];
             return [h, 50, 45];
         };
 
@@ -230,16 +256,121 @@
             return `${s}.${m.toString().padStart(2, '0')}`;
         };
 
+        function ColorPicker2D({ color, onChange }) {
+            const canvasRef = useRef(null);
+            const stripRef = useRef(null);
+            const dragging = useRef(false);
+            const stripDrag = useRef(false);
+
+            const [hue, sat, lit] = color.hsl;
+            const cursorX = sat / 100;
+            const cursorY = 1 - (lit / 100);
+
+            const drawCanvas = useCallback(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                const W = canvas.width;
+                const H = canvas.height;
+
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, W, H);
+
+                ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                ctx.fillRect(0, 0, W, H);
+
+                const whiteGrad = ctx.createLinearGradient(0, 0, W, 0);
+                whiteGrad.addColorStop(0, 'rgba(255,255,255,1)');
+                whiteGrad.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = whiteGrad;
+                ctx.fillRect(0, 0, W, H);
+
+                const blackGrad = ctx.createLinearGradient(0, 0, 0, H);
+                blackGrad.addColorStop(0, 'rgba(0,0,0,0)');
+                blackGrad.addColorStop(1, 'rgba(0,0,0,1)');
+                ctx.fillStyle = blackGrad;
+                ctx.fillRect(0, 0, W, H);
+            }, [hue]);
+
+            const drawStrip = useCallback(() => {
+                const canvas = stripRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const W = canvas.width;
+                const H = canvas.height;
+                const grad = ctx.createLinearGradient(0, 0, W, 0);
+                [0, 60, 120, 180, 240, 300, 360].forEach((h, i) => {
+                    grad.addColorStop(i / 6, `hsl(${h},100%,50%)`);
+                });
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, W, H);
+            }, []);
+
+            useEffect(() => { drawCanvas(); }, [drawCanvas]);
+            useEffect(() => { drawStrip(); }, [drawStrip]);
+
+            const sampleAndChange = (clientX, clientY, currentHue) => {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                const xPercent = Math.max(0.01, Math.min(0.99, (clientX - rect.left) / rect.width));
+                const yPercent = Math.max(0.01, Math.min(0.99, (clientY - rect.top) / rect.height));
+
+                const pixel = ctx.getImageData(xPercent * canvas.width, yPercent * canvas.height, 1, 1).data;
+
+                onChange({
+                    hsl: [currentHue, Math.round(xPercent * 100), Math.round((1 - yPercent) * 100)],
+                    rgb: [pixel[0], pixel[1], pixel[2]]
+                });
+            };
+
+            const updateHue = (clientX) => {
+                const rect = stripRef.current.getBoundingClientRect();
+                const x = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+                const newHue = Math.round(x * 360);
+                const canvasRect = canvasRef.current.getBoundingClientRect();
+                sampleAndChange(canvasRect.left + (cursorX * canvasRect.width), canvasRect.top + (cursorY * canvasRect.height), newHue);
+            };
+
+            useEffect(() => {
+                const up = () => { dragging.current = false; stripDrag.current = false; };
+                window.addEventListener('mouseup', up);
+                window.addEventListener('touchend', up);
+                return () => { window.removeEventListener('mouseup', up); window.removeEventListener('touchend', up); };
+            }, [cursorX, cursorY]);
+
+            return (
+                <div className="flex flex-col gap-4 w-full">
+                    <div className="picker-wrap rounded-2xl overflow-hidden" style={{ aspectRatio: '1 / 0.7' }}>
+                        <canvas ref={canvasRef} id="picker-canvas" width={400} height={280} onMouseDown={(e) => { dragging.current = true; sampleAndChange(e.clientX, e.clientY, hue); }} onMouseMove={(e) => { if (dragging.current) sampleAndChange(e.clientX, e.clientY, hue); }} onTouchStart={(e) => { dragging.current = true; sampleAndChange(e.touches[0].clientX, e.touches[0].clientY, hue); }} onTouchMove={(e) => { if (dragging.current) sampleAndChange(e.touches[0].clientX, e.touches[0].clientY, hue); }} />
+                        <div className="picker-cursor" style={{ left: `${cursorX * 100}%`, top: `${cursorY * 100}%`, background: `rgb(${color.rgb[0]},${color.rgb[1]},${color.rgb[2]})` }} />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Hue • {hue}°</label>
+                        <div className="relative" style={{ height: '28px' }}>
+                            <canvas ref={stripRef} width={400} height={28} className="w-full h-full rounded-lg cursor-crosshair" onMouseDown={(e) => { stripDrag.current = true; updateHue(e.clientX); }} onMouseMove={(e) => { if (stripDrag.current) updateHue(e.clientX); }} onTouchStart={(e) => { stripDrag.current = true; updateHue(e.touches[0].clientX); }} onTouchMove={(e) => { if (stripDrag.current) updateHue(e.touches[0].clientX); }} />
+                            <div style={{ position: 'absolute', left: `${(hue / 360) * 100}%`, top: '50%', transform: 'translate(-50%, -50%)', width: '18px', height: '18px', borderRadius: '50%', border: '3px solid white', background: `hsl(${hue},100%,50%)`, pointerEvents: 'none' }} />
+                        </div>
+                    </div>
+                    <div className="flex gap-2 text-[10px] mono text-white/30 font-bold tracking-widest">
+                        <span>H {hue}°</span><span>·</span><span>S {sat}%</span><span>·</span><span>L {lit}%</span>
+                    </div>
+                </div>
+            );
+        }
+
         function ColorGame() {
             const [round, setRound] = useState(1);
             const [stage, setStage] = useState('start');
             const [targetColor, setTargetColor] = useState([0, 0, 0]);
-            const [guessColor, setGuessColor] = useState([180, 100, 50]);
+            const [guessColor, setGuessColor] = useState({ hsl: [180, 60, 50], rgb: [51, 204, 204] });
             const [history, setHistory] = useState([]);
             const [msTimer, setMsTimer] = useState(5000);
             const [guessTimer, setGuessTimer] = useState(30);
             const [toast, setToast] = useState(null);
             const [resultTimer, setResultTimer] = useState(5);
+            const [showVideo, setShowVideo] = useState(false);
 
             useEffect(() => {
                 let id;
@@ -271,18 +402,86 @@
                 return () => clearInterval(id);
             }, [stage, resultTimer]);
 
+
+            // MAC DEBUG: start//
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Enter') {
+                        if (stage === 'guess') submitGuess();
+                        if (stage === 'result') next();
+                    }
+
+                    // MAC DEBUG: Option + 5 (Jump to Round 5 with 4 random rounds)
+                    if (e.altKey && (e.key === '5' || e.code === 'Digit5')) {
+                        e.preventDefault();
+                        setRound(5);
+                        setTargetColor(generateColor(5));
+                        setMsTimer(5000);
+                        setStage('memorize');
+
+                        // Rounds 1-4 get random scores 1.0 to 10.0
+                        setHistory([1, 2, 3, 4].map(r => ({
+                            round: r,
+                            target: [Math.random() * 360, 70, 50],
+                            guess: `rgb(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255})`,
+                            score: parseFloat(((Math.random() * 9) + 1).toFixed(2))
+                        })));
+                    }
+
+                    // MAC DEBUG: Option + 3 (Jump to Final Results)
+                    if (e.altKey && (e.key === '3' || e.code === 'Digit3')) {
+                        e.preventDefault();
+                        // All 5 rounds get random scores 1.0 to 10.0
+                        setHistory([1, 2, 3, 4, 5].map(r => ({
+                            round: r,
+                            target: [Math.random() * 360, 70, 50],
+                            guess: `rgb(${Math.random() * 255},${Math.random() * 255},${Math.random() * 255})`,
+                            score: parseFloat(((Math.random() * 9) + 1).toFixed(2))
+                        })));
+                        setStage('final');
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [stage, guessColor, targetColor]);
+            // MAC DEBUG: END*/
+
             const submitGuess = () => {
-                const s = calculateScore(targetColor, guessColor);
-                setHistory([...history, { round, target: targetColor, guess: guessColor, score: s }]);
-                setResultTimer(5);
-                setStage('result');
+                const [tr, tg, tb] = hslToRgb(...targetColor);
+                const [gr, gg, gb] = guessColor.rgb;
+                const dist = Math.sqrt(Math.pow(tr - gr, 2) + Math.pow(tg - gg, 2) + Math.pow(tb - gb, 2));
+                const acc = 1 - (dist / 441.67);
+
+                let finalScore;
+                const t = 0.7;
+                const breakScore = 10 * Math.pow(t, 1.7);
+
+                if (acc < t) {
+                    finalScore = 10 * Math.pow(acc, 1.7);
+                } else {
+                    const remainingAcc = (acc - t) / (1 - t);
+                    finalScore = breakScore + (10 - breakScore) * Math.sqrt(remainingAcc);
+                }
+
+                const s = parseFloat(Math.min(10, finalScore).toFixed(2));
+
+                // Fixed History Data Sync
+                const guessRgbString = `rgb(${gr}, ${gg}, ${gb})`;
+                setHistory(p => [...p, { round, target: [...targetColor], guess: guessRgbString, score: s }]);
+
+                setResultTimer(5); setStage('result');
             };
 
             const next = () => {
                 setResultTimer(-2);
                 if (round < 5) {
-                    setRound(round + 1); setTargetColor(generateColor(round + 1));
-                    setGuessColor([180, 100, 50]); setMsTimer(5000); setStage('memorize');
+                    const nextRound = round + 1;
+                    setRound(nextRound);
+                    setTargetColor(generateColor(nextRound));
+                    setGuessColor({ hsl: [180, 60, 50], rgb: [51, 204, 204] });
+                    setMsTimer(5000);
+                    setStage('memorize');
                 } else setStage('final');
             };
 
@@ -301,99 +500,104 @@
             };
 
             if (stage === 'start') return (
-                <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-[#050505] overflow-y-auto">
-                    <h1 className="text-6xl md:text-8xl font-black italic mb-10 tracking-tighter select-none">Optic<span className="text-zinc-500">AI</span></h1>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 w-full max-w-5xl mb-12">
-                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-2">
-                            <div className="text-2xl md:text-3xl">👁️</div>
-                            <h3 className="font-black text-[12px] md:text-[14px] tracking-[0.1em] uppercase text-zinc-100">Stare</h3>
-                            <p className="text-[11px] text-zinc-400 leading-relaxed font-medium italic">5 seconds. Burn the color into your retinas.</p>
+                <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center bg-[#050505]">
+                    <h1 className="text-8xl font-black italic mb-10 tracking-tighter select-none">Optic<span className="text-zinc-500">AI</span></h1>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mb-12">
+                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-3">
+                            <div className="text-3xl">👁️</div>
+                            <h3 className="font-black text-[14px] tracking-[0.1em] uppercase text-zinc-100">Stare</h3>
+                            <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">5 seconds. Burn the color into your retinas -- Don't blink!</p>
                         </div>
-                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-2">
-                            <div className="text-2xl md:text-3xl">🎨</div>
-                            <h3 className="font-black text-[12px] md:text-[14px] tracking-[0.1em] uppercase text-zinc-100">Match</h3>
-                            <p className="text-[11px] text-zinc-400 leading-relaxed font-medium italic">30 seconds to guess. Accuracy is everything.</p>
+                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-3">
+                            <div className="text-3xl">🎨</div>
+                            <h3 className="font-black text-[14px] tracking-[0.1em] uppercase text-zinc-100">Match</h3>
+                            <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">30 seconds to guess the colour. It's your time to shine!</p>
                         </div>
-                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-2">
-                            <div className="text-2xl md:text-3xl">⚖️</div>
-                            <h3 className="font-black text-[12px] md:text-[14px] tracking-[0.1em] uppercase text-zinc-100">Score</h3>
-                            <p className="text-[11px] text-zinc-400 leading-relaxed font-medium italic">Aim for a "7" or higher score each round.</p>
+                        <div className="bg-white/5 p-6 rounded-[32px] border border-white/5 space-y-3">
+                            <div className="text-3xl">⚖️</div>
+                            <h3 className="font-black text-[14px] tracking-[0.1em] uppercase text-zinc-100">Score</h3>
+                            <p className="text-xs text-zinc-400 leading-relaxed font-medium italic">Aim for a "7" or higher score each round.</p>
                         </div>
                     </div>
+                    <div className="flex flex-col items-center gap-6 mb-12">
+                        <button
+                            onClick={() => { setTargetColor(generateColor(1)); setStage('memorize'); setMsTimer(5000); }}
+                            className="neu-btn-white animate-glow text-black px-8 h-16 rounded-full font-black tracking-[0.05em] text-[24px] flex items-center justify-center gap-6 group transition-all active:scale-95"
+                        >
+                            <span className="group-hover:text-zinc-500 transition-colors duration-300">Start OpticAI</span>
+                            <div className="bg-black/5 w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                                <svg className="w-5 h-5 text-black/60 group-hover:text-zinc-400 transition-colors" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M11 13L15 9M15 9H9M15 9V15" /><circle cx="12" cy="12" r="10" />
+                                </svg>
+                            </div>
+                        </button>
 
-                    <button onClick={() => { setTargetColor(generateColor(1)); setStage('memorize'); setMsTimer(5000); }} className="neu-btn-white animate-glow text-black px-8 h-16 rounded-full font-black tracking-[0.05em] text-[20px] md:text-[24px] flex items-center justify-center gap-4 group mb-6 transition-all active:scale-95">
-                        <span>Start OpticAI</span>
-                        <div className="bg-black/5 w-10 h-10 rounded-full flex items-center justify-center">
-                            <svg className="w-5 h-5 text-black/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 13L15 9M15 9H9M15 9V15" /><circle cx="12" cy="12" r="10" /></svg>
-                        </div>
-                    </button>
+                        {/* NEW: Demo Video Trigger */}
+                        <button
+                            onClick={() => setShowVideo(true)}
+                            className="flex items-center gap-3 text-zinc-500 hover:text-white transition-all duration-300 group cursor-pointer"
+                        >
+                            <div className="w-8 h-8 rounded-full border border-zinc-800 flex items-center justify-center group-hover:border-white transition-colors">
+                                <svg className="w-3 h-3 fill-current ml-0.5" viewBox="0 0 24 24">
+                                    <path d="M3 22v-20l18 10-18 10z" />
+                                </svg>
+                            </div>
+                            <span className="text-[11px] font-black uppercase tracking-[0.3em]">Watch Demo</span>
+                        </button>
 
-                    <div className="bg-white/[0.03] border border-white/5 px-6 py-3 rounded-2xl mb-8">
-                        <p className="text-[10px] font-bold text-white/40 tracking-widest leading-relaxed">
-                            ⚡ Calibration Tip: Disable Night Shift & Brightness > 80%
-                        </p>
+                        {/* In-Page YouTube Modal */}
+                        {showVideo && (
+                            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                                <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setShowVideo(false)} />
+                                <div className="relative w-full max-w-4xl aspect-video bg-zinc-900 rounded-[32px] overflow-hidden border border-white/10 shadow-2xl">
+                                    <button
+                                        onClick={() => setShowVideo(false)}
+                                        className="absolute top-6 right-6 z-10 bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-white hover:text-black transition-all font-bold"
+                                    >✕</button>
+                                    <iframe
+                                        className="w-full h-full"
+                                        src="https://www.youtube.com/embed/8K8JRp7aBOs?autoplay=1"
+                                        title="OpticAI Demo"
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                    ></iframe>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
-                    <p className="font-bold tracking-[0.05em] text-white/60 mb-12 text-sm md:text-base">5 Colours! 5 Rounds! <br />Are your eyes lying to you?</p>
-                    <div className="mt-auto md:fixed md:bottom-10 text-[14px] font-bold tracking-[0.05em] text-zinc-700">Made by Ayan Jyoti Dutta 😇</div>
+                    <p className="text-shadow-xl font-bold tracking-[0.05em] text-white/60 mb-16">5 Colours! <br />5 Roundsss!!! <br />Are your eyes lying to you?!?</p>
+                    <div className="mt-auto md:fixed md:bottom-10 text-[16px] font-bold tracking-[0.05em] text-zinc-700">Made by Ayan Jyoti Dutta 😇</div>
                 </div>
             );
 
             if (stage === 'memorize') return (
-                <div className="h-screen w-full flex flex-col items-center justify-center pulse-container p-6 text-center" style={{ backgroundColor: `hsl(${targetColor[0]}, ${targetColor[1]}%, ${targetColor[2]}%)` }}>
-                    <h2 className="text-white font-black tracking-[0.2em] md:tracking-[0.3em] uppercase mb-8 text-xl md:text-2xl drop-shadow-2xl">Memorise the colour</h2>
-                    <div className="bg-black/40 backdrop-blur-2xl rounded-[32px] md:rounded-[40px] px-10 md:px-16 py-8 md:py-10 border border-white/10 shadow-2xl">
-                        <div className="text-[80px] md:text-[120px] font-black mono text-white leading-none tracking-tighter">{formatMs(msTimer)}</div>
-                    </div>
+                <div className="h-screen w-full flex flex-col items-center justify-center pulse-container" style={{ backgroundColor: `hsl(${targetColor[0]}, ${targetColor[1]}%, ${targetColor[2]}%)` }}>
+                    <h2 className="text-white font-black tracking-widest uppercase mb-8 text-xl">Memorise the colour</h2>
+                    <div className="bg-black/40 backdrop-blur-2xl rounded-[40px] px-16 py-10 border border-white/10"><div className="text-[80px] font-black mono text-white leading-none tracking-tighter">{formatMs(msTimer)}</div></div>
                 </div>
             );
 
             if (stage === 'guess') return (
-                <div className="h-screen w-full relative flex flex-col items-center justify-end md:justify-center p-6" style={{ backgroundColor: `hsl(${guessColor[0]}, ${guessColor[1]}%, ${guessColor[2]}%)` }}>
-                    <h2 className="absolute top-20 md:top-24 text-white font-black tracking-[0.2em] md:tracking-[0.3em] uppercase text-lg md:text-2xl drop-shadow-2xl text-center w-full px-4">Guess the colour</h2>
-
-                    <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-xl px-8 md:px-10 py-2 md:py-3 rounded-full border border-white/10">
-                        <span className="mono font-bold text-xl md:text-3xl tracking-widest text-white">{guessTimer} Sec</span>
-                    </div>
-
-                    <div className="w-full max-w-md md:absolute md:top-24 md:right-8 md:bottom-8 md:w-80 glass rounded-[32px] md:rounded-[40px] p-6 md:p-8 flex flex-col gap-6 md:gap-10 z-10 shadow-2xl text-white mb-4 md:mb-0">
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Hue • {guessColor[0]}°</label>
-                            <input type="range" min="0" max="360" value={guessColor[0]} onChange={e => setGuessColor([parseInt(e.target.value), guessColor[1], guessColor[2]])} className="hue-slider" />
-                        </div>
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Saturation • {guessColor[1]}%</label>
-                            <input type="range" min="0" max="100" value={guessColor[1]} onChange={e => setGuessColor([guessColor[0], parseInt(e.target.value), guessColor[2]])} />
-                        </div>
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-white/40">Brightness • {guessColor[2]}%</label>
-                            <input type="range" min="0" max="100" value={guessColor[2]} onChange={e => setGuessColor([guessColor[0], guessColor[1], parseInt(e.target.value)])} />
-                        </div>
-                        <button onClick={submitGuess} className="neu-btn mt-4 md:mt-auto text-white py-4 md:py-5 rounded-2xl font-black tracking-widest uppercase text-lg md:text-xl active:scale-95 transition">Lock it In</button>
+                <div className="h-screen w-full relative flex flex-col items-center justify-end md:justify-center p-6" style={{ backgroundColor: `rgb(${guessColor.rgb[0]}, ${guessColor.rgb[1]}, ${guessColor.rgb[2]})` }}>
+                    <h2 className="absolute top-24 text-white font-black tracking-widest uppercase text-xl drop-shadow-2xl">Guess the colour</h2>
+                    <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-xl px-10 py-3 rounded-full border border-white/10"><span className="mono font-bold text-2xl text-white">{guessTimer} Sec</span></div>
+                    <div className="w-full max-w-sm md:absolute md:top-24 md:right-8 md:bottom-8 md:w-80 glass rounded-[40px] p-6 flex flex-col gap-5 z-10 shadow-2xl">
+                        <ColorPicker2D color={guessColor} onChange={setGuessColor} />
+                        <button onClick={submitGuess} className="neu-btn text-white py-4 rounded-2xl font-black uppercase tracking-widest">Lock it In</button>
                     </div>
                 </div>
             );
 
             if (stage === 'result') return (
                 <div className="h-screen flex flex-col bg-black relative">
-                    <div className="flex-1 w-full relative" style={{ backgroundColor: `hsl(${targetColor[0]}, ${targetColor[1]}%, ${targetColor[2]}%)` }}>
-                        <div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/30 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 whitespace-nowrap">
-                            <span className="text-[14px] md:text-[20px] font-black text-white/80 uppercase tracking-widest">Original Colour</span>
-                        </div>
-                    </div>
-                    <div className="flex-1 w-full relative" style={{ backgroundColor: `hsl(${guessColor[0]}, ${guessColor[1]}%, ${guessColor[2]}%)` }}>
-                        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/30 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 whitespace-nowrap">
-                            <span className="text-[14px] md:text-[20px] font-black text-white/80 uppercase tracking-widest">Your Colour</span>
-                        </div>
-                    </div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-4 md:gap-6 z-20 w-full px-6">
-                        <div className="bg-white text-black px-8 md:px-12 py-4 md:py-6 rounded-[24px] md:rounded-[32px] shadow-xl border-[4px] md:border-[5px] border-black/30 text-center">
-                            <div className="text-[16px] md:text-[24px] font-black tracking-[0.1em] opacity-30 mb-1">Score</div>
-                            <div className="text-4xl md:text-6xl font-black mono">{history[history.length - 1].score}</div>
-                        </div>
-                        <button onClick={next} className="neu-btn px-8 md:px-10 py-3 rounded-full font-black border border-white/10 text-white text-[16px] md:text-[20px] flex items-center gap-4 active:scale-95 transition-all">
-                            {round === 5 ? "View Results" : "Next Round"}
+                    <div className="flex-1" style={{ backgroundColor: `hsl(${targetColor[0]}, ${targetColor[1]}%, ${targetColor[2]}%)` }}><div className="absolute top-8 left-1/2 -translate-x-1/2 bg-black/30 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white uppercase font-black">Original</div></div>
+                    <div className="flex-1" style={{ backgroundColor: `rgb(${guessColor.rgb[0]}, ${guessColor.rgb[1]}, ${guessColor.rgb[2]})` }}><div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/30 backdrop-blur-md px-6 py-2 rounded-full border border-white/10 text-white uppercase font-black">Your Colour</div></div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-6 w-full px-6">
+                        <div className="bg-white text-black px-12 py-6 rounded-[32px] shadow-xl text-center"><div className="text-6xl font-black mono">{history[history.length - 1]?.score}</div></div>
+                        <button onClick={next} className="neu-btn px-10 py-3 rounded-full font-black text-white flex items-center gap-4 active:scale-95 transition-all">
+                            {round === 5 ? "Results" : "Next"}
                             <div className="relative w-8 h-8 flex items-center justify-center">
                                 <svg className="timer-svg w-full h-full" viewBox="0 0 36 36">
                                     <circle className="stroke-white/10 fill-none" strokeWidth="3" cx="18" cy="18" r="16" />
@@ -417,56 +621,40 @@
                 const targetScore = Math.max(25, calculatedTarget);
                 const retryText = `Try Beating ${targetScore} Score`;
                 const tier = getTieredInfo(rawTotal);
-
                 return (
-                    <div className="min-h-screen w-full bg-[#080808] p-6 md:p-10 flex flex-col items-center overflow-y-auto">
-                        {toast && <div className="bg-white text-black px-8 py-3 rounded-full text-[10px] font-black uppercase tracking-widest shadow-2xl toast">{toast}</div>}
-
-                        <div className="flex flex-col items-center justify-center text-center mt-8 md:mt-12 mb-10 md:mb-16">
-                            <h2 className="text-blue-400 font-black tracking-[0.3em] md:tracking-[0.4em] text-[18px] md:text-[24px] uppercase mb-4 italic">{tier.label}</h2>
-                            <div className="flex items-baseline justify-center mb-4 select-none">
-                                <div className="text-[80px] md:text-[120px] font-black leading-none tracking-tighter mono">{totalDisplay}</div>
-                                <div className="text-[30px] md:text-[40px] font-black mono text-zinc-700 ml-2 tracking-tighter">/50</div>
-                            </div>
-                            <p className="text-zinc-500 font-medium italic text-sm md:text-lg opacity-80 px-4">"{tier.quote}"</p>
+                    <div className="min-h-screen w-full bg-[#080808] p-10 flex flex-col items-center overflow-y-auto">
+                        {toast && <div className="bg-white text-black px-8 py-3 rounded-full text-[10px] font-black uppercase toast">{toast}</div>}
+                        <div className="text-center mt-12 mb-16">
+                            <h2 className="text-blue-400 font-black tracking-widest uppercase mb-4 italic">{tier.label}</h2>
+                            <div className="text-[80px] font-black mono text-white">{rawTotal.toFixed(2)}<span className="text-zinc-700 text-4xl ml-2">/50</span></div>
+                            <p className="text-zinc-500 italic">"{tier.quote}"</p>
                         </div>
-
-                        <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-6 mb-12">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-12 w-full max-w-6xl">
                             {history.map((h, i) => (
-                                <div key={i} className="stage-card bg-[#111] border border-zinc-800 rounded-[24px] md:rounded-[32px] p-5 md:p-6 flex flex-col gap-4">
-                                    <div className="flex justify-between items-center px-1">
-                                        <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Stage 0{i + 1}</span>
-                                        <span className="mono font-bold text-white/90 text-sm">{h.score}</span>
-                                    </div>
-                                    <div className="h-24 md:h-32 rounded-xl md:rounded-2xl overflow-hidden border border-zinc-900 shadow-inner relative">
+                                <div key={i} className="stage-card-interactive bg-[#111] border border-zinc-800 rounded-[32px] p-6 space-y-4">
+                                    <div className="flex justify-between text-[10px] font-black text-zinc-600 uppercase"><span>Stage 0{i + 1}</span><span>{h.score}</span></div>
+                                    <div className="h-32 rounded-2xl overflow-hidden border border-zinc-900 relative">
                                         <div className="h-1/2 w-full" style={{ backgroundColor: `hsl(${h.target[0]}, ${h.target[1]}%, ${h.target[2]}%)` }} />
-                                        <div className="h-1/2 w-full" style={{ backgroundColor: `hsl(${h.guess[0]}, ${h.guess[1]}%, ${h.guess[2]}%)` }} />
-                                        <div className="absolute inset-x-0 h-px bg-white/10 top-1/2" />
+                                        <div className="h-1/2 w-full" style={{ backgroundColor: h.guess }} />
                                     </div>
                                 </div>
                             ))}
                         </div>
-
-                        <div className="flex flex-col items-center gap-4 mb-16 w-full max-w-md">
-                            <div className="flex flex-row items-center gap-3 w-full">
-                                <button onClick={copyGameLink} className="neu-btn-white w-14 h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center shrink-0 active:scale-90">
-                                    <svg className="w-6 h-6 text-black opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                                    </svg>
+                        <div className="flex flex-col items-center gap-6 mb-20 w-full max-w-md">
+                            <div className="flex flex-row items-center gap-4 w-full">
+                                <button onClick={copyGameLink} className="neu-btn-white w-16 h-16 rounded-full flex items-center justify-center group shrink-0 active:scale-90">
+                                    <svg className="w-6 h-6 text-black opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
                                 </button>
-                                <button onClick={() => copyScoreCard(tier, totalDisplay)} className="neu-btn-white flex-1 h-14 md:h-16 text-black rounded-full font-black text-base md:text-lg flex items-center justify-center gap-3 active:scale-95">
+                                <button onClick={() => copyScoreCard(tier, rawTotal.toFixed(2))} className="neu-btn-white flex-1 h-16 text-black rounded-full font-black text-lg flex items-center justify-center gap-4 group active:scale-95">
                                     <span>Share Result</span>
-                                    <div className="bg-black/5 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center">
-                                        <svg className="w-4 h-4 md:w-5 md:h-5 text-black/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 13L15 9M15 9H9M15 9V15" /><circle cx="12" cy="12" r="10" /></svg>
+                                    <div className="bg-black/5 w-10 h-10 rounded-full flex items-center justify-center group-hover:bg-black/10 transition-colors">
+                                        <svg className="w-5 h-5 text-black/60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M11 13L15 9M15 9H9M15 9V15" /><circle cx="12" cy="12" r="10" /></svg>
                                     </div>
                                 </button>
                             </div>
-                            <button onClick={() => window.location.reload()} className="neu-btn animate-glow w-full text-zinc-400 hover:text-white h-14 md:h-16 rounded-full font-black text-base md:text-lg transition active:scale-95">
-                                {retryText}
-                            </button>
+                            <button onClick={() => window.location.reload()} className="neu-btn animate-glow w-full text-zinc-400 hover:text-white h-16 rounded-full font-black text-lg transition active:scale-95">{retryText}</button>
                         </div>
-                        <div className="text-[14px] font-medium text-zinc-700 pb-10">Made by Ayan Jyoti Dutta 😇</div>
+                        <div className="text-[16px] font-medium text-zinc-700 pb-10">Made by Ayan Jyoti Dutta 😇</div>
                     </div>
                 );
             }
